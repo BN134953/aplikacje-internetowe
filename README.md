@@ -1,3 +1,4 @@
+[Dokumentacja.md](https://github.com/user-attachments/files/31715054/Dokumentacja.md)
 # Temat projektu
 
 **GameHUB** to aplikacja internetowa służąca do przeglądania i kupowania gier komputerowych. Użytkownik może założyć konto, zalogować się, przeglądać katalog gier, kupować gry za monety oraz zarządzać swoją biblioteką. Administrator posiada panel zarządzania, w którym może dodawać, edytować i usuwać gry oraz zarządzać użytkownikami.
@@ -66,9 +67,9 @@ W pliku `.env` należy ustawić dane połączenia z bazą PostgreSQL, np.:
 `DB_CONNECTION=pgsql`  
 `DB_HOST=127.0.0.1`  
 `DB_PORT=5432`  
-`DB_DATABASE=biblioteka_gier`  
+`DB_DATABASE=gamehub_database`  
 `DB_USERNAME=postgres`  
-`DB_PASSWORD=admin`
+`DB_PASSWORD=twoje_haslo`
 
 Jeśli projekt nie ma jeszcze pliku `.env`, należy skopiować `.env.example` jako `.env` i wygenerować klucz aplikacji:
 
@@ -84,20 +85,18 @@ Opcjonalnie można uruchomić seedery, aby dodać przykładowe dane:
 
 ### Dane początkowe
 
-Domyślne konto administratora:
+Aktualna baza projektu po migracji danych to `gamehub_database`.
 
-Login: `admin@gamehub.pl`  
-Hasło: `zaq1@WSX`
+Administrator nie jest rozpoznawany po fragmencie adresu e-mail. Uprawnienia administratora są zapisane w kolumnie `users.is_admin`.
 
-Przykładowe konto użytkownika:
+Po świeżej instalacji należy:
 
-Login: `user1@gmail.com`  
-Hasło: `zaq1@WSX`
+1. Uruchomić migracje: `php artisan migrate`.
+2. Zarejestrować zwykłe konto w aplikacji.
+3. Nadać mu rolę administratora w terminalu: `php artisan user:promote-admin adres@email.pl`.
+4. Potwierdzić operację.
 
-Dodatkowo w bazie mogą znajdować się testowi użytkownicy:
-
-Login: `user01@gamehub.pl` do `user30@gamehub.pl`  
-Hasło: `zaq1@WSX`
+Komenda działa wyłącznie dla istniejącego użytkownika i nie tworzy nowego konta. Hasła kont nie są publikowane w dokumentacji.
 
 ### Uruchomienie projektu w terminalu
 
@@ -136,9 +135,9 @@ Wymagania sprzętowe są niewielkie. Do płynnego działania wystarczy standardo
 W aplikacji występują dwie główne role:
 
 * **Użytkownik / klient** - może przeglądać katalog gier, kupować gry za monety, zwracać zakupione gry, doładowywać portfel, korzystać z biblioteki oraz edytować swój profil.
-* **Administrator** - może zarządzać katalogiem gier, dodawać nowe gry, edytować istniejące tytuły, usuwać gry oraz zarządzać użytkownikami.
+* **Administrator** - może zarządzać katalogiem gier, dodawać nowe gry, edytować istniejące tytuły, usuwać gry oraz zarządzać użytkownikami. Dostęp administratora wynika z pola `users.is_admin`, a nie z treści adresu e-mail.
 
-Administrator widzi panel zarządzania, a zwykły użytkownik widzi sklep, bibliotekę i panel ze swoimi grami.
+Administrator widzi panel zarządzania, a zwykły użytkownik widzi sklep, bibliotekę i panel ze swoimi grami. Zmiana adresu e-mail na zawierający słowo `admin` nie nadaje dodatkowych uprawnień.
 
 ### Rejestracja
 
@@ -186,8 +185,7 @@ Użytkownik może przejść do profilu i zmienić swoje dane, takie jak nazwa u�
 
 ## Strefa Administratora
 
-Login: `admin@gamehub.pl`  
-Hasło: `zaq1@WSX`
+Dostęp do strefy administratora ma wyłącznie konto z `users.is_admin = true`. Po świeżej instalacji rolę administratora nadaje komenda `php artisan user:promote-admin adres@email.pl`.
 
 ### Panel administratora
 
@@ -219,7 +217,7 @@ Administrator może usunąć grę z katalogu. Po usunięciu gra nie będzie wido
 
 ### Zarządzanie użytkownikami
 
-Administrator może przeglądać listę użytkowników, edytować ich dane oraz usuwać konta. System zabezpiecza administratora przed usunięciem aktualnie zalogowanego konta administratora.
+Administrator może przeglądać listę użytkowników, edytować ich dane oraz usuwać konta. System zabezpiecza administratora przed usunięciem aktualnie zalogowanego konta administratora oraz przed pozostawieniem systemu bez żadnego administratora.
 
 ---
 
@@ -232,7 +230,9 @@ System obsługuje kilka ważnych przypadków brzegowych:
 * użytkownik nie może zwrócić gry, której nie posiada,
 * przy zwrocie gry system oddaje cenę zapisaną w momencie zakupu,
 * formularze sprawdzają poprawność danych, np. wymagane pola, poprawny e-mail oraz cenę liczbową,
-* administrator nie powinien usuwać własnego, aktualnie zalogowanego konta.
+* administrator nie powinien usuwać własnego, aktualnie zalogowanego konta,
+* system nie pozwala pozostawić aplikacji bez żadnego administratora,
+* zwykły użytkownik nie uzyskuje uprawnień administratora przez zmianę adresu e-mail.
 
 ---
 
@@ -240,7 +240,7 @@ System obsługuje kilka ważnych przypadków brzegowych:
 
 System przechowuje:
 
-* dane użytkowników: nazwa, e-mail, hasło, saldo monet,
+* dane użytkowników: nazwa, e-mail, hasło, saldo monet oraz flaga administratora,
 * dane gier: tytuł, opis, producent, gatunek, data premiery, cena i okładka,
 * dane zakupów: użytkownik, gra oraz cena zakupu,
 * informacje sesji użytkownika,
@@ -248,9 +248,9 @@ System przechowuje:
 
 Najważniejsze tabele w bazie to:
 
-* `users`,
-* `games`,
-* `game_user`.
+* `users` - konta użytkowników, saldo oraz `is_admin`,
+* `games` - katalog gier, ceny i okładki,
+* `game_user` - zakupy użytkowników i cena zakupu.
 
 Tabela `game_user` przechowuje między innymi `purchase_price`, czyli cenę gry w momencie zakupu.
 
@@ -263,6 +263,12 @@ Najważniejszym mechanizmem aplikacji jest proces kupowania i zwracania gry.
 Podczas zakupu system sprawdza saldo użytkownika. Jeśli użytkownik ma wystarczającą liczbę monet, gra zostaje przypisana do użytkownika, a cena zakupu zostaje zapisana w tabeli `game_user`.
 
 Podczas zwrotu system nie pobiera aktualnej ceny gry z tabeli `games`. Zamiast tego używa ceny zapisanej w momencie zakupu. Dzięki temu zwrot jest poprawny nawet wtedy, gdy administrator zmienił później cenę gry.
+
+---
+
+## Eksport bazy danych
+
+Aktualny eksport bazy `gamehub_database` z danymi znajduje się w pliku `gamehub_database.sql` w folderze dokumentacji. Plik zawiera strukturę bazy oraz dane, dlatego nie należy publikować go w miejscu publicznym.
 
 ---
 
@@ -286,13 +292,12 @@ Interfejs aplikacji jest responsywny. Karty gier układają się w siatkę, któ
 W przyszłości aplikację można rozbudować o:
 
 * system ocen i opinii dla gier,
-* szczegółową stronę pojedynczej gry,
 * historię zakupów użytkownika,
 * koszyk zakupowy,
 * raport sprzedaży dla administratora,
 * wgrywanie okładek jako plików,
-* role użytkowników zapisane w bazie danych,
 * paginację katalogu gier,
 * filtrowanie po cenie,
 * system powiadomień e-mail,
 * cache dla katalogu gier w celu poprawy wydajności.
+
